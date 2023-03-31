@@ -1,0 +1,75 @@
+%&pdflatex
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+
+\title{Brief 3DViewer ver1.0 manual}
+
+\author{21school}
+
+\begin{document}
+
+% first manual page
+\maketitle
+
+\pagebreak
+
+\renewcommand\contentsname{}
+\tableofcontents
+% \begin{itemize}
+%   \item
+%   \item
+% \end{itemize}
+
+\pagebreak
+
+\section{Brief introduction}
+
+
+The program is aimed at to view 3D wireframe models (3D Viewer). The models themselves may be loaded from .obj files and be viewable on the screen with the ability to rotate, scale and translate.
+
+\pagebreak
+\section{Functionalty}
+
+\subsection{The program provides the ability to}
+
+  \begin{itemize}
+    \item Load a wireframe model from an obj file (vertices and surfaces list support only).
+    \item Translate the model by a given distance in relation to the X, Y, Z axes.
+    \item Rotate the model by a given angle relative to its X, Y, Z axes.
+    \item Scale the model by a given value.
+  \end{itemize}
+
+  \subsection{The graphical user interface contains}
+
+  \begin{itemize}
+    \item A button to select the model file and a field to output its name.
+    \item A visualisation area for the wireframe model.
+    \item Button/buttons and input fields for translating the model.
+    \item Button/buttons and input fields for rotating the model.
+    \item Button/buttons and input fields for scaling the model.
+    \item Information about the uploaded model - file name, number of vertices and edges.
+  \end{itemize}
+
+  The program correctly processes and allows user to view models with details up to 100, 1000, 10,000, 100,000, 1,000,000  vertices without freezing.
+
+\pagebreak
+
+\section{Settings and saving}
+
+\subsection{Settings.}
+\begin{itemize}
+\item The program allows customizing the type of projection (parallel and central)
+\item The program allows setting up the type (solid, dashed), color and thickness of the edges, display method (none, circle, square), color and size of the vertices
+\item The program allows choosing the background color
+\item Settings are saved between program restarts
+\end{itemize}
+
+\subsection{Record.}
+\begin{itemize}
+\item The program allows saving the captured (rendered) images as bmp and jpeg files.
+\item The program allows recording small screencasts by a special button - the current custom affine transformation of the loaded object into gif-animation (640x480, 10fps, 5s)
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,64 @@
+1
+docker pull nginx
+docker images
+docker run -d nginx:latest
+docker ps
+docker inspect 3e902b296b21
+docker stop 3e902b296b21
+docker ps
+docker run -d -p 80:80 -p 443:443 nginx:latest
+curl localhost
+docker ps
+docker restart 5bb2b8df2bcf
+curl localhost
+
+2
+docker exec 5bb2b8df2bcf cat /etc/nginx/nginx.conf
+docker cp nginx.conf 5bb2b8df2bcf:/etc/nginx/
+docker exec 5bb2b8df2bcf nginx -s reload
+curl localhost/status
+
+docker container export 5bb2b8df2bcf -o container.tar
+docker stop 5bb2b8df2bcf
+docker rmi -f nginx:latest
+docker rm -f 5bb2b8df2bcf
+docker import -c 'CMD ["nginx", "-g", "daemon off";]' container.tar nginx
+docker run -d -p 80:80 -p 443:443 nginx:latest
+docker rmi -f 16818aca5096
+docker rm -f c613171bf9ff
+docker import -c 'CMD ["nginx", "-g", "daemon off;"]' container.tar nginx
+docker run -d -p 80:80 -p 443:443 nginx:latest
+curl localhost/status
+
+3
+docker run -d -p 81:81 -p 443:443 nginx:latest
+docker cp nginx.conf 40e35a638f9e:/etc/nginx/
+docker cp ser.sh 40e35a638f9e:/tmp/
+docker cp server.c 40e35a638f9e:/tmp/
+docker exec -it 40e35a638f9e bash
+apt-get update && apt-get install -y sudo && apt-get install -y gcc && sudo apt-get install -y libfcgi-dev && sudo apt-get install -y spawn-fcgi
+cd tmp
+gcc server.c -lfcgi -o server
+spawn-fcgi -p 8080 ./server
+nginx -s reload
+curl localhost:81
+
+4
+docker rm -f b2d036c8ca51
+docker images
+docker build -t image1:tag1 .
+docker images
+docker run -d -p 80:81 -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf image1:tag1
+curl localhost
+docker restart 3f0e2725dbcd
+curl localhost/status
+
+5
+dockle -ak NGINX_GPGKEY image1:tag1
+docker build -t image2:tag2 .
+dockle -ak NGINX_GPGKEY image2:tag2
+
+6
+docker-compose build
+docker-compose up
+curl localhost

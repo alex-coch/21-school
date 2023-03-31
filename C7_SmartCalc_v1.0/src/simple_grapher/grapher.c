@@ -1,0 +1,356 @@
+#include "grapher.h"
+
+#include <math.h>
+#include <stdint.h>
+
+/* like a private things */
+#define UNUSED(expr) (void)(expr)
+
+typedef struct {
+  GtkDrawingArea *draw_area;
+  GtkWindow *window;
+  double *x;
+  double *y;
+  double range[2];
+  double domain[2];
+  uint64_t count_of_dots;
+} plotter_t;
+
+typedef struct {
+  double box_left;
+  double box_right;
+  double box_top;
+  double box_bot;
+  double x_min;
+  double x_max;
+  double y_min;
+  double y_max;
+} packed_data_t;
+
+static plotter_t plotter;
+
+void draw_function(cairo_t *, packed_data_t *);
+void draw_box(cairo_t *, packed_data_t *);
+void draw_axes(cairo_t *, packed_data_t *);
+void draw_labels(cairo_t *, packed_data_t *);
+
+/** @brief Equals NAN y variable that out of boundaries.
+ *
+ *  @param y a pointer to y variable.
+ *  @param count_of_dots a amount of dots.
+ *  @param y_min a minimum.
+ *  @param y_max a maximum.
+ *
+ *  @return void.
+ */
+void cut_tops(double *y, unsigned count_of_dots, double y_min, double y_max) {
+  for (unsigned i = 0; i < count_of_dots; ++i) {
+    if (y[i] > y_max || y[i] < y_min) {
+      y[i] = NAN;
+    }
+  }
+}
+
+/** @brief Maps dots in d arrsy between x_start and x_end.
+ *
+ *  @param x an array of double.
+ *  @param x_start a start point.
+ *  @param x_end an end point.
+ *  @param count_of_dots a amount of dots.
+ *
+ *  @return void.
+ */
+void linspace(double *x, double x_start, double x_end, unsigned count_of_dots) {
+  count_of_dots = count_of_dots - 1;
+  double dx = (x_end - x_start) / count_of_dots;
+
+  x[0] = x_start;
+  for (unsigned i = 1; i < count_of_dots; ++i) {
+    x[i] = x[i - 1] + dx;
+  }
+
+  x[count_of_dots] = x_end;
+}
+
+/** @brief Initializes a plotter.
+ *
+ *  @return void.
+ */
+void plotter_init() { memset(&plotter, 0, sizeof(plotter_t)); }
+
+/** @brief Sets some parameters in a plotter.
+ *
+ *  @param x an array of x double.
+ *  @param y an array of y double.
+ *  @param count_of_dots a amount of dots.
+ *
+ *  @return void.
+ */
+void plotter_set_function(double *x, double *y, unsigned count_of_dots) {
+  plotter.x = x;
+  plotter.y = y;
+  plotter.count_of_dots = count_of_dots;
+}
+
+/** @brief Sets a x range in a plotter.
+ *
+ *  @param x_min a start point.
+ *  @param x_max an end point.
+ *
+ *  @return void.
+ */
+void plotter_set_range(double x_min, double x_max) {
+  plotter.range[0] = x_min;
+  plotter.range[1] = x_max;
+}
+
+/** @brief Sets a y range in a plotter.
+ *
+ *  @param y_min a start point.
+ *  @param y_max an end point.
+ *
+ *  @return void.
+ */
+void plotter_set_domain(double y_min, double y_max) {
+  plotter.domain[0] = y_min;
+  plotter.domain[1] = y_max;
+}
+
+/** @brief Manages a signal on close action.
+ *
+ *  @return void.
+ */
+void plotter_signal_connect_on_close(void (*on_close)(GtkWidget *widget,
+                                                      gpointer pointer),
+                                     gpointer data) {
+  g_signal_connect(GTK_WIDGET(plotter.draw_area), "destroy",
+                   G_CALLBACK(on_close), data);
+}
+
+/** @brief Draws a plotter window.
+ *
+ *  @return void.
+ */
+void plotter_draw() {
+  plotter.draw_area = GTK_DRAWING_AREA(gtk_drawing_area_new());
+  plotter.window = GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
+
+  /* set minimum window size */
+  gtk_widget_set_size_request(GTK_WIDGET(plotter.window), 640, 480);
+
+  /* set window title */
+  gtk_window_set_title(GTK_WINDOW(plotter.window), "plote");
+
+  /* set default window size */
+  gtk_window_set_default_size(GTK_WINDOW(plotter.window), 640, 480);
+
+  /* add drawing area to window */
+  gtk_container_add(GTK_CONTAINER(plotter.window),
+                    GTK_WIDGET(plotter.draw_area));
+
+  /* connect the draw signal to the drawing area */
+  g_signal_connect(GTK_DRAWING_AREA(plotter.draw_area), "draw",
+                   G_CALLBACK(on_draw_call), NULL);
+
+  /* show all window parents */
+  gtk_widget_show_all(GTK_WIDGET(plotter.window));
+}
+
+/** @brief Puts elements on a plot window.
+ *
+ *  @param draw_area a pointer to a Gtk widget.
+ *  @param cr a pointer to a Cairo struct.
+ *  @param gpointer null.
+ *
+ *  @return a flag of an operation.
+ */
+gboolean on_draw_call(GtkWidget *draw_area, cairo_t *cr, gpointer null) {
+  UNUSED(null);
+  int X = gtk_widget_get_allocated_width(draw_area);
+  int Y = gtk_widget_get_allocated_height(draw_area);
+
+  double box_left = 75;
+  double box_right = X - 75;
+  double box_top = 25;
+  double box_bot = Y - 25;
+
+  double xmin = plotter.range[0];
+  double xmax = plotter.range[1];
+
+  double ymin = plotter.domain[0];
+  double ymax = plotter.domain[1];
+
+  packed_data_t data = {box_left, box_right, box_top, box_bot,
+                        xmin,     xmax,      ymin,    ymax};
+
+  draw_function(cr, &data);
+
+  draw_box(cr, &data);
+
+  draw_axes(cr, &data);
+
+  draw_labels(cr, &data);
+
+  return TRUE;
+}
+
+/** @brief Draws a graph of a function.
+ *
+ *  @param cr a pointer to a Cairo struct.
+ *  @param data a pointer to data.
+ *
+ *  @return a void.
+ */
+void draw_function(cairo_t *cr, packed_data_t *data) {
+  double x_stretching_koef =
+      (data->box_right - data->box_left) / (data->x_max - data->x_min);
+  double y_stretching_koef =
+      (data->box_top - data->box_bot) / (data->y_max - data->y_min);
+
+  double x_start = -x_stretching_koef * data->x_min + data->box_left;
+  double y_start = -y_stretching_koef * data->y_min + data->box_bot;
+
+  cut_tops(plotter.y, plotter.count_of_dots, data->y_min, data->y_max);
+
+  cairo_set_source_rgb(cr, 1, 0, 0);
+  cairo_set_line_width(cr, 2);
+  cairo_move_to(cr, (plotter.x[0] * x_stretching_koef + x_start),
+                (plotter.y[0] * y_stretching_koef + y_start));
+
+  uint64_t i = 1;
+  while (i < plotter.count_of_dots) {
+    if (isnan(plotter.y[i]) || isinf(plotter.y[i])) {
+      while (i < plotter.count_of_dots - 1 &&
+             (isnan(plotter.y[i]) || isinf(plotter.y[i]))) {
+        i++;
+      }
+      cairo_move_to(cr, (plotter.x[i] * x_stretching_koef + x_start),
+                    (plotter.y[i] * y_stretching_koef + y_start));
+    }
+    cairo_line_to(cr, (plotter.x[i] * x_stretching_koef + x_start),
+                  (plotter.y[i] * y_stretching_koef + y_start));
+    ++i;
+  }
+  cairo_stroke(cr);
+}
+
+/** @brief Draws an outline box.
+ *
+ *  @param cr a pointer to a Cairo struct.
+ *  @param data a pointer to data.
+ *
+ *  @return a void.
+ */
+void draw_box(cairo_t *cr, packed_data_t *data) {
+  cairo_set_source_rgb(cr, 0, 0, 0.0);
+  cairo_set_line_width(cr, 1);
+  cairo_move_to(cr, data->box_left, data->box_top);
+  cairo_line_to(cr, data->box_right, data->box_top);
+  cairo_line_to(cr, data->box_right, data->box_bot);
+  cairo_line_to(cr, data->box_left, data->box_bot);
+  cairo_line_to(cr, data->box_left, data->box_top);
+  cairo_stroke(cr);
+}
+
+/** @brief Draws axes.
+ *
+ *  @param cr a pointer to a Cairo struct.
+ *  @param data a pointer to data.
+ *
+ *  @return a void.
+ */
+void draw_axes(cairo_t *cr, packed_data_t *data) {
+  cairo_text_extents_t extents;
+
+  cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+  cairo_select_font_face(cr, "Helvetica", CAIRO_FONT_SLANT_ITALIC,
+                         CAIRO_FONT_WEIGHT_BOLD);
+  cairo_set_font_size(cr, 24);
+  cairo_text_extents(cr, "x", &extents);
+  cairo_move_to(cr, data->box_right, data->box_bot);
+  cairo_show_text(cr, "x");
+
+  cairo_select_font_face(cr, "Helvetica", CAIRO_FONT_SLANT_ITALIC,
+                         CAIRO_FONT_WEIGHT_BOLD);
+  cairo_set_font_size(cr, 24);
+  cairo_text_extents(cr, "y", &extents);
+  cairo_move_to(cr, data->box_left + extents.height * 0.8, data->box_top);
+  cairo_save(cr);
+  // cairo_rotate(cr, -PI / 2);
+  cairo_show_text(cr, "y");
+  cairo_restore(cr);
+  cairo_stroke(cr);
+
+  cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+  cairo_set_line_width(cr, 1);
+  for (int i = 1; i < 6; ++i) {
+    cairo_move_to(cr, data->box_left,
+                  data->box_bot - i * (data->box_bot - data->box_top) / 6);
+    cairo_line_to(cr, data->box_right,
+                  data->box_bot - i * (data->box_bot - data->box_top) / 6);
+  }
+
+  for (int i = 1; i < 6; ++i) {
+    cairo_move_to(cr,
+                  data->box_left + (data->box_right - data->box_left) / 6 * i,
+                  data->box_bot);
+    cairo_line_to(cr,
+                  data->box_left + (data->box_right - data->box_left) / 6 * i,
+                  data->box_top);
+  }
+  cairo_stroke(cr);
+}
+
+/** @brief Depicts labes for axes.
+ *
+ *  @param cr a pointer to a Cairo struct.
+ *  @param data a pointer to data.
+ *
+ *  @return a void.
+ */
+void draw_labels(cairo_t *cr, packed_data_t *data) {
+  double dgrid_x = (data->x_max - data->x_min) / 6;
+  double dgrid_y = (data->y_max - data->y_min) / 6;
+
+  gchar str_num[32];
+  cairo_text_extents_t extents;
+
+  /* label axis y from bot to top */
+  cairo_set_source_rgb(cr, 255.0, 0.0, 0.0);
+  cairo_select_font_face(cr, "Helvetica", CAIRO_FONT_SLANT_ITALIC,
+                         CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size(cr, 12.0);
+  for (int i = 0; i < 7; ++i) {
+    g_snprintf(str_num, sizeof(str_num), "%.6g", data->x_min + dgrid_x * i);
+    cairo_save(cr);
+    cairo_text_extents(cr, str_num, &extents);
+    cairo_move_to(cr,
+                  data->box_left +
+                      ((data->box_right - data->box_left) / 6 * i) -
+                      extents.height / 2,
+                  data->box_bot + extents.height + 1);
+    cairo_show_text(cr, str_num);
+    cairo_restore(cr);
+  }
+
+  /* label axis x from left to right*/
+  for (int i = 0; i < 7; ++i) {
+    g_snprintf(str_num, sizeof(str_num), "%.6g", data->y_max - i * dgrid_y);
+    cairo_save(cr);
+    cairo_text_extents(cr, str_num, &extents);
+    cairo_move_to(cr, data->box_left - extents.width * 1.1,
+                  data->box_top + (data->box_bot - data->box_top) / 6 * i +
+                      extents.height / 2);
+    cairo_show_text(cr, str_num);
+    cairo_restore(cr);
+  }
+
+  g_snprintf(
+      str_num, sizeof(str_num), "x/y %.6g",
+      -1 * (((data->box_right - data->box_left) / (data->x_max - data->x_min)) /
+            ((data->box_top - data->box_bot) / (data->y_max - data->y_min))));
+  cairo_move_to(cr, data->box_right + 2, data->box_top + extents.height);
+  cairo_text_extents(cr, str_num, &extents);
+  cairo_show_text(cr, str_num);
+  cairo_stroke(cr);
+}
