@@ -1,0 +1,1 @@
+g++ -Wall -Werror -Wextra -Wpedantic -fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment -g --coverage CMakeFiles/tests.dir/tests.cc.o -o tests  s21_matrix_oop.a /usr/lib/x86_64-linux-gnu/libgtest_main.a /usr/lib/x86_64-linux-gnu/libgtest.a 
