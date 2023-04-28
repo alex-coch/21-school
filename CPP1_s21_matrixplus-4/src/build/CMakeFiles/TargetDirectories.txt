@@ -1,4 +1,0 @@
-/home/alex/21-school/CPP1_s21_matrixplus-4/src/build/CMakeFiles/s21_matrix_oop.dir
-/home/alex/21-school/CPP1_s21_matrixplus-4/src/build/CMakeFiles/tests.dir
-/home/alex/21-school/CPP1_s21_matrixplus-4/src/build/CMakeFiles/edit_cache.dir
-/home/alex/21-school/CPP1_s21_matrixplus-4/src/build/CMakeFiles/rebuild_cache.dir
